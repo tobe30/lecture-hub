@@ -140,7 +140,7 @@ if (isLoading) {
           </p>
 
           <Link
-            to={`/student/live/${liveSession.id}`}
+            to={`/session/${liveSession.id}`}
             className="mt-4 inline-flex h-10 items-center gap-2 rounded-[12px] bg-red-500 px-4 text-[14px] font-semibold text-white transition hover:bg-red-600"
           >
             Join Live Session

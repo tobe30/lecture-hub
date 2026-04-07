@@ -34,9 +34,16 @@ const Dashboard = () => {
 
   const totalClasses = classes.length;
 
-  const totalStudents = classes.reduce((total, cls) => {
-    return total + (cls.students?.length || 0);
-  }, 0);
+const uniqueStudentIds = new Set();
+
+classes.forEach((cls) => {
+  (cls.students || []).forEach((student) => {
+    const studentId = typeof student === "string" ? student : student?._id;
+    if (studentId) uniqueStudentIds.add(studentId);
+  });
+});
+
+const totalStudents = uniqueStudentIds.size;
 
   const latestSession = sessions[0];
 

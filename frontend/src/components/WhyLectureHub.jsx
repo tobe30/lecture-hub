@@ -23,7 +23,7 @@ export default function WhyLectureHub() {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-[#f7f9ff] py-24">
+    <section id="solutions" className="relative overflow-hidden bg-[#f7f9ff] py-24">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.06),_transparent_45%)]" />
 
       <div className="relative mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">

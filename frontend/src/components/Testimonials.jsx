@@ -42,7 +42,7 @@ export default function Testimonials() {
   const active = testimonials[current];
 
   return (
-    <section className="bg-[#f8f8f8] py-20">
+    <section id="testimonials" className="bg-[#f8f8f8] py-20">
       <div className="mx-auto max-w-[1180px] px-4 md:px-6">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
           {/* Left image - static */}

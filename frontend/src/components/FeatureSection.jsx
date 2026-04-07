@@ -20,7 +20,7 @@ export default function FeatureSection() {
   ];
 
   return (
-    <section className="bg-[#f7f7f5] py-20">
+    <section id="features" className="bg-[#f7f7f5] py-20">
       <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-center gap-14 px-4 md:px-6 lg:grid-cols-[1.08fr_0.92fr]">
         {/* Left */}
         <div className="relative mx-auto w-full max-w-[640px]">

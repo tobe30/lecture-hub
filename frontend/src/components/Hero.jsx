@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
+
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[#f7f7f8]">
+    <section id="Home" className="relative overflow-hidden bg-[#f7f7f8]">
       {/* background shapes */}
       <div className="pointer-events-none absolute inset-0">
         {/* top left shape */}
@@ -60,9 +62,13 @@ export default function Hero() {
          High-quality video, clear audio, and interactive classroom tools help lecturers teach effectively and keep students engaged from anywhere.
         </p>
 
-        <button className="mt-10 h-[56px] rounded-full bg-[#165DFF] px-20 text-[20px] font-medium text-white transition hover:bg-[#0f4fe0] sm:px-5 sm:text-[20px]">
-          Get Access
-        </button>
+
+<Link
+  to="/register"
+  className="mt-10 inline-flex items-center justify-center h-[56px] rounded-full bg-[#165DFF] px-20 text-[20px] font-medium text-white transition hover:bg-[#0f4fe0] sm:px-5"
+>
+  Get Access
+</Link>
       </div>
     </section>
   );

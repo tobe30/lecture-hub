@@ -1,67 +1,100 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getAuthUser } from "../lib/api";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
-  return (
-    <header className="w-full bg-white border-b border-gray-100">
-      <nav className="mx-auto flex h-[90px] max-w-[1000px] items-center justify-between px-2 lg:px-0">
-        
-        {/* Logo */}
-{/* Logo */}
-<div className="flex items-center mt-3">
-  <img
-    src="/lh-logo.png"
-    alt="logo"
-    className="h-[30px] w-auto object-contain scale-[1.4] origin-left"
-  />
-</div>
+  const { data: authData } = useQuery({
+    queryKey: ["authUser"],
+    queryFn: getAuthUser,
+    retry: false,
+  });
 
-        {/* Desktop Navigation */}
+  const user = authData?.user;
+
+  const dashboardPath =
+    user?.role === "instructor"
+      ? "/dashboard"
+      : user?.role === "student"
+      ? "/student/dashboard"
+      : "/dashboard";
+
+  return (
+    <header className="w-full border-b border-gray-100 bg-white">
+      <nav className="mx-auto flex h-[90px] max-w-[1000px] items-center justify-between px-2 lg:px-0">
+        <div className="mt-3 flex items-center">
+          <img
+            src="/lh-logo.png"
+            alt="logo"
+            className="h-[30px] w-auto origin-left scale-[1.4] object-contain"
+          />
+        </div>
+
         <ul className="hidden items-center gap-7 lg:flex">
           <li>
-            <a href="#" className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]">
+            <a
+              href="#Home"
+              className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]"
+            >
               Home
             </a>
           </li>
 
           <li>
-            <a href="#" className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]">
+            <a
+              href="#features"
+              className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]"
+            >
               Features
             </a>
           </li>
 
           <li>
-            <a href="#" className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]">
-              Product
+            <a
+              href="#testimonials"
+              className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]"
+            >
+              Testimonials
             </a>
           </li>
 
           <li>
-            <a href="#" className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]">
+            <a
+              href="#solutions"
+              className="text-[15px] font-medium text-gray-800 hover:text-[#165DFF]"
+            >
               Solutions
             </a>
           </li>
         </ul>
 
-        {/* Desktop Buttons */}
-       <div className="hidden items-center gap-3 lg:flex">
-  <Link to="/login">
-    <button className="h-[36px] rounded-full px-4 text-[14px] font-medium text-gray-700 hover:text-[#165DFF]">
-      Login
-    </button>
-  </Link>
+        <div className="hidden items-center gap-3 lg:flex">
+          {user ? (
+            <Link to={dashboardPath}>
+              <button className="h-[36px] rounded-full bg-[#165DFF] px-5 text-[14px] font-medium text-white transition hover:bg-[#0f4fe0]">
+                Dashboard
+              </button>
+            </Link>
+          ) : (
+            <>
+              <Link to="/login">
+                <button className="h-[36px] rounded-full px-4 text-[14px] font-medium text-gray-700 hover:text-[#165DFF]">
+                  Login
+                </button>
+              </Link>
 
-  <Link to="/register">
-    <button className="h-[36px] rounded-full bg-[#165DFF] px-4 text-[14px] font-medium text-white hover:bg-[#0f4fe0]">
-      Sign Up
-    </button>
-  </Link>
-</div>
+              <Link to="/register">
+                <button className="h-[36px] rounded-full bg-[#165DFF] px-4 text-[14px] font-medium text-white transition hover:bg-[#0f4fe0]">
+                  Sign Up
+                </button>
+              </Link>
+            </>
+          )}
+        </div>
 
-        {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 lg:hidden"
@@ -70,7 +103,6 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile Menu */}
       {isOpen && (
         <div className="border-t border-gray-100 bg-white px-6 pb-6 pt-4 lg:hidden">
           <ul className="flex flex-col gap-4">
@@ -99,19 +131,29 @@ export default function Navbar() {
             </li>
           </ul>
 
-          <div className="hidden items-center gap-3 lg:flex">
-  <Link to="/login">
-    <button className="h-[36px] rounded-full px-4 text-[14px] font-medium text-gray-700 hover:text-[#165DFF]">
-      Login
-    </button>
-  </Link>
+          <div className="mt-5 flex flex-col gap-3">
+            {user ? (
+              <Link to={dashboardPath} onClick={() => setIsOpen(false)}>
+                <button className="h-[40px] w-full rounded-full bg-[#165DFF] font-medium text-white">
+                  Dashboard
+                </button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <button className="h-[40px] w-full rounded-full border border-gray-200 text-gray-700">
+                    Login
+                  </button>
+                </Link>
 
-  <Link to="/register">
-    <button className="h-[36px] rounded-full bg-[#165DFF] px-4 text-[14px] font-medium text-white hover:bg-[#0f4fe0]">
-      Sign Up
-    </button>
-  </Link>
-</div>
+                <Link to="/register" onClick={() => setIsOpen(false)}>
+                  <button className="h-[40px] w-full rounded-full bg-[#165DFF] font-medium text-white">
+                    Sign Up
+                  </button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       )}
     </header>

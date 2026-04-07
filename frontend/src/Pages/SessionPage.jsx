@@ -1,649 +1,322 @@
-import { useEffect, useMemo, useState } from "react";
-import { Users, MessageSquare, User, ClipboardCheck, Mic, Loader2Icon } from "lucide-react";
-import { endSession, getAuthUser, getSessionById, JoinSession } from "../lib/api";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { StreamCall, StreamVideo } from "@stream-io/video-react-sdk";
+import {
+  Loader2Icon,
+  LogOutIcon,
+  PhoneOffIcon,
+  LayoutGridIcon,
+  MonitorPlayIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+} from "lucide-react";
+
+import VideoCallUI from "./VideoCallUI";
 import useStreamClient from "../hooks/useStreamClient";
-import {
-  StreamCall,
-  StreamVideo,
-  CallControls,
-  ParticipantView,
-  useCallStateHooks,
-} from "@stream-io/video-react-sdk";
-import {
-  Channel,
-  Chat,
-  MessageInput,
-  MessageList,
-  Thread,
-  Window,
-} from "stream-chat-react";
-import { useParams, Navigate } from "react-router-dom";
-import "@stream-io/video-react-sdk/dist/css/styles.css";
-import "stream-chat-react/dist/css/v2/index.css";
-import toast from "react-hot-toast";
-import { useNavigate } from "react-router";
-
-function LectureLayout({ lecturerId }) {
-  const { useParticipants } = useCallStateHooks();
-  const participants = useParticipants();
-
-
-  const { lecturerParticipant, studentParticipants } = useMemo(() => {
-    if (!participants || participants.length === 0) {
-      return {
-        lecturerParticipant: null,
-        studentParticipants: [],
-      };
-    }
-
-    const lecturer = participants.find(
-      (participant) => String(participant?.userId) === String(lecturerId)
-    );
-
-    const students = participants.filter(
-      (participant) => String(participant?.userId) !== String(lecturerId)
-    );
-
-    return {
-      lecturerParticipant: lecturer || null,
-      studentParticipants: students,
-    };
-  }, [participants, lecturerId]);
-
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      {/* Lecturer big video */}
-      <div className="flex-1 min-h-[320px] overflow-hidden rounded-[20px] border border-white/5 bg-[#151d2d]">
-        {lecturerParticipant ? (
-          <ParticipantView participant={lecturerParticipant} />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-slate-300 text-sm">
-            Lecturer has not joined yet
-          </div>
-        )}
-      </div>
-
-      {/* Students small row */}
-      <div className="min-w-0 overflow-x-auto overflow-y-hidden pb-2">
-        <div className="flex gap-2.5 w-max min-w-full">
-          {studentParticipants.length > 0 ? (
-            studentParticipants.map((participant) => (
-              <div
-                key={participant.sessionId}
-                className="w-[110px] h-[85px] sm:w-[120px] sm:h-[90px] shrink-0 overflow-hidden rounded-[18px] border border-white/5 bg-[#151d2d]"
-              >
-                <ParticipantView participant={participant} />
-              </div>
-            ))
-          ) : (
-            <div className="text-sm text-slate-400 px-2 py-2">
-              No students in session yet
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SpeakerArea({ streamClient, call, loading, lecturerId }) {
-  const navigate = useNavigate();
-
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
-                    <p className="text-lg">Connecting to video call...</p>
-                  </div>
-                </div>
-    );
-  }
-
-  if (!streamClient || !call) {
-    return (
-      <div className="flex-1 min-h-[260px] rounded-[20px] border border-white/5 bg-[#151d2d] flex items-center justify-center text-red-400">
-        Error loading session
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden str-video">
-      <StreamVideo client={streamClient}>
-        <StreamCall call={call}>
-          <LectureLayout lecturerId={lecturerId} />
-
-          <div className="mt-3 px-2 sm:px-1">
-            <div className="mx-auto max-w-full sm:max-w-xl rounded-2xl sm:rounded-full border border-white/10 bg-[#0a1120] px-2 py-2 overflow-x-auto">
-              <div className="min-w-max flex justify-center">
-                <CallControls onLeave={() => navigate("/dashboard")} />
-              </div>
-            </div>
-          </div>
-        </StreamCall>
-      </StreamVideo>
-    </div>
-  );
-}
-
-function ChatMessages({ chatClient, channel, chatError }) {
-  if (chatError) {
-    return (
-      <div className="text-red-400 text-sm">
-        {chatError}
-      </div>
-    );
-  }
-
-  if (!chatClient || !channel) {
-    return <div className="text-slate-400">Loading chat...</div>;
-  }
-
-  return (
-    <div className="h-full min-h-0">
-      <Chat client={chatClient} theme="str-chat__theme-dark">
-        <Channel channel={channel}>
-          <Window>
-            <MessageList />
-            <MessageInput />
-          </Window>
-          <Thread />
-        </Channel>
-      </Chat>
-    </div>
-  );
-}
-
-function PeopleList({ session }) {
-  const lecturer = session?.lecturer;
-  const classStudents = session?.class?.students || [];
-  const attendees = session?.attendees || [];
-
-  const attendeeIds = new Set(
-    attendees
-      .map((attendee) => String(attendee?.student?._id || attendee?.student || ""))
-      .filter(Boolean)
-  );
-
-  const people = [
-    ...(lecturer
-      ? [
-          {
-            _id: String(lecturer._id),
-            name: lecturer.name,
-            email: lecturer.email,
-            role: "Lecturer",
-            isOnline: true,
-          },
-        ]
-      : []),
-    ...classStudents.map((student) => ({
-      _id: String(student._id),
-      name: student.name,
-      email: student.email,
-      role: "Student",
-      isOnline: attendeeIds.has(String(student._id)),
-    })),
-  ];
-
-  return (
-    <div className="space-y-3">
-      {people.map((person) => (
-        <div
-          key={person._id}
-          className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-        >
-          <div>
-            <p className="text-sm font-semibold text-white">{person.name}</p>
-            <p className="text-xs text-slate-400">{person.email}</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] px-2 py-1 rounded-full bg-blue-500/15 text-blue-300">
-              {person.role}
-            </span>
-
-            <span
-              className={`text-[11px] px-2 py-1 rounded-full ${
-                person.isOnline
-                  ? "bg-emerald-500/15 text-emerald-300"
-                  : "bg-slate-500/15 text-slate-300"
-              }`}
-            >
-              {person.isOnline ? "Live" : "Offline"}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-function AttendanceList({ session }) {
-  const classStudents = session?.class?.students || [];
-  const attendees = session?.attendees || [];
-
-  const attendeeStudentIds = new Set(
-    attendees
-      .map((attendee) => {
-        if (!attendee) return null;
-
-        if (attendee.student?._id) return String(attendee.student._id);
-        if (attendee.student) return String(attendee.student);
-
-        return null;
-      })
-      .filter(Boolean)
-  );
-
-  const attendancePeople = classStudents.map((student) => ({
-    _id: String(student._id),
-    name: student.name,
-    email: student.email,
-    present: attendeeStudentIds.has(String(student._id)),
-  }));
-
-  const presentCount = attendancePeople.filter((person) => person.present).length;
-  const absentCount = attendancePeople.filter((person) => !person.present).length;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-slate-400">Present</p>
-          <p className="text-xl font-semibold text-emerald-400 mt-1">
-            {presentCount}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-slate-400">Absent</p>
-          <p className="text-xl font-semibold text-red-400 mt-1">
-            {absentCount}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {attendancePeople.map((person) => (
-          <div
-            key={person._id}
-            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-          >
-            <div>
-              <p className="text-sm font-semibold text-white">{person.name}</p>
-              <p className="text-xs text-slate-400">{person.email}</p>
-            </div>
-
-            <span
-              className={`text-[11px] px-3 py-1 rounded-full font-medium ${
-                person.present
-                  ? "bg-emerald-500/15 text-emerald-300"
-                  : "bg-red-500/15 text-red-300"
-              }`}
-            >
-              {person.present ? "Present" : "Absent"}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PeoplePanelContent({ session }) {
-  const { useParticipants } = useCallStateHooks();
-  const participants = useParticipants();
-
-  return <PeopleList session={session} participants={participants} />;
-}
-
-function SidePanel({ activeTab, setActiveTab, chatClient, channel, chatError, session }) {
-  return (
-    <div className="h-full min-h-0 bg-[#0a1120] border border-white/5 rounded-[20px] flex flex-col overflow-hidden">
-      <div className="border-b border-white/10 px-4 shrink-0">
-        <div className="flex items-end gap-5 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab("chat")}
-            className={`h-12 sm:h-14 shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold border-b-2 ${
-              activeTab === "chat"
-                ? "text-[#3b82f6] border-[#3b82f6]"
-                : "text-slate-500 border-transparent"
-            }`}
-          >
-            <MessageSquare size={15} />
-            CHAT
-          </button>
-
-          <button
-            onClick={() => setActiveTab("people")}
-            className={`h-12 sm:h-14 shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold border-b-2 ${
-              activeTab === "people"
-                ? "text-[#3b82f6] border-[#3b82f6]"
-                : "text-slate-500 border-transparent"
-            }`}
-          >
-            <User size={15} />
-            PEOPLE
-          </button>
-
-          <button
-            onClick={() => setActiveTab("attendance")}
-            className={`h-12 sm:h-14 shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold border-b-2 ${
-              activeTab === "attendance"
-                ? "text-[#3b82f6] border-[#3b82f6]"
-                : "text-slate-500 border-transparent"
-            }`}
-          >
-            <ClipboardCheck size={15} />
-            ATTENDANCE
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-        {activeTab === "chat" && (
-          <ChatMessages chatClient={chatClient} channel={channel} chatError={chatError} />
-        )}
-       {activeTab === "people" && <PeoplePanelContent session={session} />}
-        {activeTab === "attendance" && <AttendanceList session={session} />}
-      </div>
-    </div>
-  );
-}
+import { endSession, getAuthUser, getSessionById, JoinSession } from "../lib/api";
 
 export default function SessionPage() {
-  const [mobileTab, setMobileTab] = useState("video");
-  const [desktopTab, setDesktopTab] = useState("chat");
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const { data: authResponse } = useQuery({
+  const [activeLayout] = useState("speaker");
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showEndedScreen, setShowEndedScreen] = useState(false);
+  const redirectTimeoutRef = useRef(null);
+
+  const { data: authData } = useQuery({
     queryKey: ["authUser"],
     queryFn: getAuthUser,
-    refetchOnWindowFocus: false,
   });
 
-  const authUser = authResponse?.user;
-
-  const { data: sessionData, isLoading: loadingSession, refetch } = useQuery({
+  const {
+    data: sessionData,
+    isLoading: loadingSession,
+    refetch,
+  } = useQuery({
     queryKey: ["session", id],
     queryFn: () => getSessionById(id),
-    enabled: !!authUser && !!id,
-    refetchInterval: 5000,
+    enabled: !!id,
   });
 
+  const joinSessionMutation = useMutation({
+    mutationFn: JoinSession,
+    onSuccess: async () => {
+      await refetch();
+    },
+  });
+
+  const endSessionMutation = useMutation({
+    mutationFn: endSession,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["session", id] });
+      setShowEndedScreen(true);
+
+      redirectTimeoutRef.current = setTimeout(() => {
+        navigate("/dashboard/classes", { replace: true });
+      }, 1800);
+    },
+  });
+
+  const user = authData?.user;
+  const currentUserId = user?._id;
   const session = sessionData?.session;
 
-  const lecturerId = session?.lecturer?._id;
+  const isLecturer = session?.lecturer?._id === currentUserId;
 
-  const isHost = lecturerId === authUser?._id;
+  const isClassStudent =
+    session?.class?.students?.some((student) => {
+      if (typeof student === "string") return student === currentUserId;
+      return student?._id === currentUserId;
+    }) || false;
 
-  const isParticipant = session?.class?.students?.some(
-    (student) => student?._id === authUser?._id
-  );
+  const isAttendee =
+    session?.attendees?.some((attendee) => {
+      const attendeeId =
+        typeof attendee?.student === "string"
+          ? attendee.student
+          : attendee?.student?._id;
 
-  const { mutate: joinSessionMutation } = useMutation({
-    mutationFn: JoinSession,
-    mutationKey:["joinSession"],
-    onSuccess: () => {
-      toast.success("Joined session successfully!");
-      refetch();
-    },
-    onError: (error) =>
-      toast.error(error.response?.data?.message || "Failed to join session"),
-  });
+      return attendeeId === currentUserId;
+    }) || false;
 
-const {
-  mutate: endSessionMutation,
-  isPending: endSessionPending,
-} = useMutation({
-  mutationFn: endSession,
-  mutationKey: ["endSession"],
-  onSuccess: () => {
-    toast.success("Session ended successfully!");
-    navigate("/dashboard");
-  },
-  onError: (error) =>
-    toast.error(error.response?.data?.message || "Failed to end session"),
-});;
-
-
+  const canJoin = Boolean(isLecturer || isClassStudent || isAttendee);
+  const isSessionEnded = session?.status === "completed";
 
   useEffect(() => {
-    if (!session || !authUser || loadingSession) return;
-    if (!isHost && !isParticipant) return;
+    if (!session || loadingSession || !currentUserId) return;
+    if (session.status !== "active") return;
+    if (isLecturer) return;
+    if (!isClassStudent) return;
+    if (isAttendee) return;
 
-    joinSessionMutation(id);
-  }, [session?._id, authUser?._id, loadingSession, isHost, isParticipant, id, joinSessionMutation]);
+    joinSessionMutation.mutate(id);
+  }, [
+    session,
+    loadingSession,
+    currentUserId,
+    isLecturer,
+    isClassStudent,
+    isAttendee,
+    id,
+    joinSessionMutation,
+  ]);
 
-  
+  useEffect(() => {
+    if (!session || loadingSession) return;
+
+    if (session.status === "completed") {
+      setShowEndedScreen(true);
+
+      redirectTimeoutRef.current = setTimeout(() => {
+        if (isLecturer) {
+          navigate("/lecturer/classes", { replace: true });
+        } else {
+          navigate("/student/classes", { replace: true });
+        }
+      }, 1800);
+    }
+
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, [session, loadingSession, isLecturer, navigate]);
 
   const {
     streamClient,
     call,
     chatClient,
     channel,
-    isInitializingCall,
     chatError,
-  } = useStreamClient(session, loadingSession, isHost, isParticipant);
-
-  useEffect(() => {
-  if (!session) return;
-
-  if (session.status === "completed") {
-    toast("Session has ended");
-
-    // leave video call if inside
-    if (call) {
-      call.leave();
-    }
-
-    // redirect student
-    navigate("/dashboard");
-  }
-}, [session?.status]);
-
-if (loadingSession || !authUser) {
-  return (
-    <div className="h-screen flex items-center justify-center bg-[#050b16] text-white">
-      <div className="text-center">
-        <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
-        <p className="text-lg">Checking session...</p>
-      </div>
-    </div>
-  );
-}
-
-if (!session) {
-  return <Navigate to="/dashboard" replace />;
-}
-
-if (session.status === "completed") {
-  return <Navigate to="/dashboard" replace />;
-}
-
-
-console.log("authResponse", authResponse);
-console.log("authUser", authUser);
-console.log("sessionData", sessionData);
-console.log("session", session);
-console.log("isHost", isHost);
-console.log("isParticipant", isParticipant);
-console.log("isInitializingCall", isInitializingCall);
-console.log("session.class", session?.class);
-console.log("session.class.students", session?.class?.students);
-
-const handleEndSession = () => {
-  if (!isHost) return;
-
-  const confirmed = window.confirm(
-    "Are you sure you want to end this session?"
+    isInitializingCall,
+  } = useStreamClient(
+    session,
+    loadingSession || isSessionEnded,
+    canJoin && !isSessionEnded,
+    session?.options?.chatEnabled ?? true
   );
 
-  if (confirmed) {
-    endSessionMutation(id);
+  const handleEndSession = () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to end this session? All students will be disconnected."
+    );
+
+    if (!confirmed) return;
+    endSessionMutation.mutate(id);
+  };
+
+  if (loadingSession) {
+    return (
+      <div className="h-screen bg-[#020817] flex items-center justify-center text-white">
+        <div className="text-center">
+          <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-blue-500 mb-4" />
+          <p className="text-lg">Loading session...</p>
+        </div>
+      </div>
+    );
   }
-};
 
+  if (!session) {
+    return (
+      <div className="h-screen bg-[#020817] flex items-center justify-center p-6 text-white">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <PhoneOffIcon className="w-12 h-12 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold">Session Not Found</h2>
+          <p className="text-white/70 mt-2">
+            This live session does not exist or is no longer available.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
+  if (!canJoin) {
+    return (
+      <div className="h-screen bg-[#020817] flex items-center justify-center p-6 text-white">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <div className="w-24 h-24 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <PhoneOffIcon className="w-12 h-12 text-yellow-400" />
+          </div>
+          <h2 className="text-2xl font-bold">Access Denied</h2>
+          <p className="text-white/70 mt-2">
+            You are not allowed to join this live class session.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
+  if (showEndedScreen || session?.status === "completed") {
+    return (
+      <div className="h-screen bg-[#020817] flex items-center justify-center p-6 text-white">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <div className="w-24 h-24 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <PhoneOffIcon className="w-12 h-12 text-blue-400" />
+          </div>
+          <h2 className="text-2xl font-bold">Session Ended</h2>
+          <p className="text-white/70 mt-2">
+            This live session has ended. Redirecting you back to your dashboard...
+          </p>
+          <Loader2Icon className="w-6 h-6 mx-auto mt-5 animate-spin text-blue-400" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-screen bg-[#050b16] text-white flex flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-white/10 px-4 sm:px-5 lg:px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <h1 className="text-base sm:text-lg lg:text-xl font-semibold tracking-tight">
-            {session?.title} - {session?.class?.title}
-          </h1>
+    <div className="h-screen overflow-hidden bg-[#020817] text-white flex flex-col">
+      <div className="shrink-0 border-b border-white/10 bg-[#030c1a] px-3 sm:px-4 lg:px-6 py-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="truncate text-lg sm:text-xl font-semibold">
+                {session.class?.title || session.title}
+              </h1>
 
-          <span className="px-3 py-1 rounded-full text-xs bg-[#102c63] text-[#68a0ff] font-medium">
-            {session?.class?.courseCode || "Course"}
-          </span>
+              {session.class?.courseCode && (
+                <span className="rounded-full border border-blue-400/20 bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-300">
+                  {session.class.courseCode}
+                </span>
+              )}
 
-          <span className="px-3 py-1 rounded-full text-xs bg-[#ef4444] text-white font-medium flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-white"></span>
-            Live
-          </span>
-        </div>
+              <span className="rounded-full border border-emerald-400/20 bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
+                {session.status}
+              </span>
+            </div>
 
-<div className="flex items-center gap-3">
-  <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
-    <Users size={15} />
-    <span>Session active</span>
-  </div>
-
-  {isHost && (
-    <button
-      onClick={handleEndSession}
-      disabled={endSessionPending}
-      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium transition"
-    >
-      {endSessionPending ? "Ending..." : "End Session"}
-    </button>
-  )}
-</div>
-      </div>
-
-      <div className="hidden lg:block flex-1 min-h-0 overflow-hidden p-3 sm:p-4">
-        <div className="h-full min-h-0 grid grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] gap-4">
-          <div className="min-h-0 min-w-0 flex flex-col overflow-hidden">
-            <SpeakerArea
-              streamClient={streamClient}
-              call={call}
-              loading={isInitializingCall}
-              lecturerId={lecturerId}
-            />
+            <p className="mt-1 truncate text-sm text-white/60">
+              Lecturer: {session.lecturer?.name}
+            </p>
           </div>
 
-          <div className="min-h-0 h-full overflow-hidden">
-            <SidePanel
-              activeTab={desktopTab}
-              setActiveTab={setDesktopTab}
-              chatClient={chatClient}
-              channel={channel}
-              chatError={chatError}
-               session={session}
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setActiveLayout("speaker")}
+              className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition ${
+                activeLayout === "speaker"
+                  ? "border-blue-500/40 bg-blue-600 text-white"
+                  : "border-white/10 bg-white/[0.03] text-white/80"
+              }`}
+            >
+              <MonitorPlayIcon className="h-4 w-4" />
+              Speaker
+            </button>
+
+        
+
+            <button
+              type="button"
+              onClick={() => setShowSidebar((prev) => !prev)}
+              className="inline-flex h-10 w-10 xl:hidden items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/80"
+            >
+              {showSidebar ? (
+                <PanelRightCloseIcon className="h-4 w-4" />
+              ) : (
+                <PanelRightOpenIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {isLecturer && session.status === "active" && (
+              <button
+                onClick={handleEndSession}
+                disabled={endSessionMutation.isPending}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-red-500 px-4 text-sm font-medium text-white hover:bg-red-600 transition"
+              >
+                {endSessionMutation.isPending ? (
+                  <Loader2Icon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <LogOutIcon className="w-4 h-4" />
+                )}
+                End Session
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="lg:hidden flex-1 min-h-0 overflow-hidden p-3 flex flex-col">
-        <div className="shrink-0 grid grid-cols-4 gap-2 mb-3">
-          <button
-            onClick={() => setMobileTab("video")}
-            className={`h-10 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 ${
-              mobileTab === "video"
-                ? "bg-[#102c63] text-[#68a0ff]"
-                : "bg-white/5 text-slate-300"
-            }`}
-          >
-            <span>Video</span>
-          </button>
-
-          <button
-            onClick={() => setMobileTab("chat")}
-            className={`h-10 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 ${
-              mobileTab === "chat"
-                ? "bg-[#102c63] text-[#68a0ff]"
-                : "bg-white/5 text-slate-300"
-            }`}
-          >
-            <span>Chat</span>
-          </button>
-
-          <button
-            onClick={() => setMobileTab("people")}
-            className={`h-10 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 ${
-              mobileTab === "people"
-                ? "bg-[#102c63] text-[#68a0ff]"
-                : "bg-white/5 text-slate-300"
-            }`}
-          >
-            <span>People</span>
-          </button>
-
-          <button
-            onClick={() => setMobileTab("attendance")}
-            className={`h-10 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 ${
-              mobileTab === "attendance"
-                ? "bg-[#102c63] text-[#68a0ff]"
-                : "bg-white/5 text-slate-300"
-            }`}
-          >
-            <span>Attend</span>
-          </button>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {mobileTab === "video" && (
-            <div className="h-full min-h-0 flex flex-col overflow-hidden">
-              <SpeakerArea
-                streamClient={streamClient}
-                call={call}
-                loading={isInitializingCall}
-                lecturerId={lecturerId}
-              />
+      <div className="flex-1 min-h-0">
+        {isInitializingCall ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-blue-500 mb-4" />
+              <p className="text-lg">Connecting to live session...</p>
             </div>
-          )}
-
-          {mobileTab === "chat" && (
-            <div className="h-full min-h-0">
-              <SidePanel
-                activeTab="chat"
-                setActiveTab={setMobileTab}
-                chatClient={chatClient}
-                channel={channel}
-                chatError={chatError}
-                 session={session}
-              />
+          </div>
+        ) : !streamClient || !call ? (
+          <div className="h-full flex items-center justify-center p-6">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+              <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <PhoneOffIcon className="w-12 h-12 text-red-400" />
+              </div>
+              <h2 className="text-2xl font-bold">Connection Failed</h2>
+              <p className="text-white/70 mt-2">
+                Unable to connect to the live class session.
+              </p>
             </div>
-          )}
-
-          {mobileTab === "people" && (
-            <div className="h-full min-h-0 overflow-y-auto bg-[#0a1120] border border-white/5 rounded-[20px] p-4">
-              <h3 className="text-sm font-semibold text-white mb-4">
-                Participants
-              </h3>
-              <StreamVideo client={streamClient}>
-  <StreamCall call={call}>
-    <PeoplePanelContent session={session} />
-  </StreamCall>
-</StreamVideo>
-            </div>
-          )}
-
-          {mobileTab === "attendance" && (
-            <div className="h-full min-h-0 overflow-y-auto bg-[#0a1120] border border-white/5 rounded-[20px] p-4">
-              <h3 className="text-sm font-semibold text-white mb-4">
-                Attendance
-              </h3>
-              <AttendanceList session={session} />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="h-full">
+            <StreamVideo client={streamClient}>
+              <StreamCall call={call}>
+                <VideoCallUI
+                  chatClient={chatClient}
+                  channel={channel}
+                  chatError={chatError}
+                  lecturerId={session.lecturer?._id}
+                  session={session}
+                  activeLayout={activeLayout}
+                />
+              </StreamCall>
+            </StreamVideo>
+          </div>
+        )}
       </div>
     </div>
   );

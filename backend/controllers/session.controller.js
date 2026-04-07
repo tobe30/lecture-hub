@@ -169,7 +169,7 @@ export const joinSession = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const session = await Session.findById(id);
+    let session = await Session.findById(id);
 
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
@@ -191,14 +191,12 @@ export const joinSession = async (req, res) => {
       (studentId) => studentId.toString() === userId
     );
 
-    // allow only lecturer or class student
     if (!isLecturer && !isStudentInClass) {
       return res.status(403).json({
         message: "You are not allowed to join this session",
       });
     }
 
-    // lecturer joins without being added as attendee
     if (isLecturer) {
       return res.status(200).json({
         message: "Lecturer joined session successfully",
@@ -217,18 +215,26 @@ export const joinSession = async (req, res) => {
       });
     }
 
-    if (session.status === "completed") {
-  return res.status(400).json({
-    message: "Session already ended",
-  });
-}
-
     if (classData.capacity > 0 && session.attendees.length >= classData.capacity) {
       return res.status(400).json({ message: "Class capacity exceeded" });
     }
 
+    session = await Session.findById(id);
+
+    const stillNotJoined = !session.attendees.some(
+      (attendee) => attendee.student.toString() === userId
+    );
+
+    if (!stillNotJoined) {
+      return res.status(200).json({
+        message: "You already joined this session",
+        session,
+      });
+    }
+
     session.attendees.push({
       student: req.user._id,
+      joinedAt: new Date(),
     });
 
     await session.save();
