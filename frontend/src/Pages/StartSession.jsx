@@ -30,9 +30,7 @@ export default function StartSession() {
     meetingCode: "",
   });
 
-  const [toggleState, setToggleState] = useState(
-    Object.fromEntries(toggles.map((t) => [t.id, t.default]))
-  );
+
 
   const { mutate: addSession, isPending } = useMutation({
     mutationFn: createSession,
@@ -64,7 +62,6 @@ export default function StartSession() {
       title: formData.title,
       description: formData.description,
       meetingCode: formData.meetingCode,
-      options: toggleState,
     });
   };
 
@@ -157,43 +154,7 @@ export default function StartSession() {
             />
           </div>
 
-          <div className="border-t border-[#e5e7eb] pt-5">
-            <p className="mb-3 text-[15px] font-medium text-[#111827]">
-              Session Options
-            </p>
-
-            <div className="space-y-3">
-              {toggles.map((t) => (
-                <label
-                  key={t.id}
-                  className="flex items-center justify-between rounded-[12px] py-1"
-                >
-                  <span className="text-[15px] text-[#111827]">{t.label}</span>
-
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={toggleState[t.id]}
-                    onClick={() =>
-                      setToggleState((s) => ({
-                        ...s,
-                        [t.id]: !s[t.id],
-                      }))
-                    }
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
-                      toggleState[t.id] ? "bg-[#3b82f6]" : "bg-[#dbe2ea]"
-                    }`}
-                  >
-                    <span
-                      className={`absolute left-[2px] h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                        toggleState[t.id] ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </label>
-              ))}
-            </div>
-          </div>
+         
 
           <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#e5e7eb] pt-5">
             <Link

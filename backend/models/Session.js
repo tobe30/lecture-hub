@@ -38,24 +38,6 @@ const sessionSchema = new mongoose.Schema(
         type: String,
         default:"",
     },
-    options: {
-      chatEnabled: {
-        type: Boolean,
-        default: true,
-      },
-      raiseHandEnabled: {
-        type: Boolean,
-        default: true,
-      },
-      attendanceEnabled: {
-        type: Boolean,
-        default: true,
-      },
-      quizEnabled: {
-        type: Boolean,
-        default: false,
-      },
-    },
     attendees: [
       {
         student: {

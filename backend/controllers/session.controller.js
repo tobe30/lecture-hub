@@ -4,7 +4,7 @@ import Session from "../models/Session.js";
 
 export const createSession = async (req, res) => {
   try {
-    const { classId, title, description, options } = req.body;
+    const { classId, title, description } = req.body;
 
     // 1. Validate input
     if (!classId || !title) {
@@ -69,12 +69,6 @@ export const createSession = async (req, res) => {
       description,
       callId,
       status: "active",
-      options: {
-        chatEnabled: options?.chatEnabled ?? true,
-        raiseHandEnabled: options?.raiseHandEnabled ?? true,
-        attendanceEnabled: options?.attendanceEnabled ?? true,
-        quizEnabled: options?.quizEnabled ?? false,
-      },
     });
 
     res.status(201).json({ session });

@@ -6,7 +6,6 @@ import {
   Loader2Icon,
   LogOutIcon,
   PhoneOffIcon,
-  LayoutGridIcon,
   MonitorPlayIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
@@ -14,17 +13,24 @@ import {
 
 import VideoCallUI from "./VideoCallUI";
 import useStreamClient from "../hooks/useStreamClient";
-import { endSession, getAuthUser, getSessionById, JoinSession } from "../lib/api";
+import {
+  endSession,
+  getAuthUser,
+  getSessionById,
+  JoinSession,
+} from "../lib/api";
 
 export default function SessionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [activeLayout] = useState("speaker");
+  const [activeLayout, setActiveLayout] = useState("speaker");
   const [showSidebar, setShowSidebar] = useState(true);
   const [showEndedScreen, setShowEndedScreen] = useState(false);
+
   const redirectTimeoutRef = useRef(null);
+  const hasJoinedRef = useRef(false);
 
   const { data: authData } = useQuery({
     queryKey: ["authUser"],
@@ -43,8 +49,12 @@ export default function SessionPage() {
 
   const joinSessionMutation = useMutation({
     mutationFn: JoinSession,
+    retry: false,
     onSuccess: async () => {
       await refetch();
+    },
+    onError: () => {
+      hasJoinedRef.current = false;
     },
   });
 
@@ -86,22 +96,25 @@ export default function SessionPage() {
   const isSessionEnded = session?.status === "completed";
 
   useEffect(() => {
-    if (!session || loadingSession || !currentUserId) return;
+    if (!id || !session || loadingSession || !currentUserId) return;
     if (session.status !== "active") return;
     if (isLecturer) return;
     if (!isClassStudent) return;
     if (isAttendee) return;
+    if (joinSessionMutation.isPending) return;
+    if (hasJoinedRef.current) return;
 
+    hasJoinedRef.current = true;
     joinSessionMutation.mutate(id);
   }, [
-    session,
+    id,
+    session?.status,
     loadingSession,
     currentUserId,
     isLecturer,
     isClassStudent,
     isAttendee,
-    id,
-    joinSessionMutation,
+    joinSessionMutation.isPending,
   ]);
 
   useEffect(() => {
@@ -112,7 +125,7 @@ export default function SessionPage() {
 
       redirectTimeoutRef.current = setTimeout(() => {
         if (isLecturer) {
-          navigate("/lecturer/classes", { replace: true });
+          navigate("/dashboard/classes", { replace: true });
         } else {
           navigate("/student/classes", { replace: true });
         }
@@ -124,7 +137,7 @@ export default function SessionPage() {
         clearTimeout(redirectTimeoutRef.current);
       }
     };
-  }, [session, loadingSession, isLecturer, navigate]);
+  }, [session?.status, loadingSession, isLecturer, navigate]);
 
   const {
     streamClient,
@@ -176,7 +189,7 @@ export default function SessionPage() {
     );
   }
 
-  if (!canJoin) {
+  if (!canJoin && !joinSessionMutation.isPending) {
     return (
       <div className="h-screen bg-[#020817] flex items-center justify-center p-6 text-white">
         <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
@@ -249,8 +262,6 @@ export default function SessionPage() {
               Speaker
             </button>
 
-        
-
             <button
               type="button"
               onClick={() => setShowSidebar((prev) => !prev)}
@@ -282,11 +293,15 @@ export default function SessionPage() {
       </div>
 
       <div className="flex-1 min-h-0">
-        {isInitializingCall ? (
+        {joinSessionMutation.isPending || isInitializingCall ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-blue-500 mb-4" />
-              <p className="text-lg">Connecting to live session...</p>
+              <p className="text-lg">
+                {joinSessionMutation.isPending
+                  ? "Joining live session..."
+                  : "Connecting to live session..."}
+              </p>
             </div>
           </div>
         ) : !streamClient || !call ? (
@@ -312,6 +327,7 @@ export default function SessionPage() {
                   lecturerId={session.lecturer?._id}
                   session={session}
                   activeLayout={activeLayout}
+                  showSidebar={showSidebar}
                 />
               </StreamCall>
             </StreamVideo>
