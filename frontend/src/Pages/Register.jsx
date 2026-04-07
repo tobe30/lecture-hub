@@ -22,10 +22,10 @@ export default function Register() {
     password: "",
   });
 
-console.log({
-  ...formData,
-  role,
-});
+// console.log({
+//   ...formData,
+//   role,
+// });
   const queryClient = useQueryClient();
 
   const {mutate:registerMutation, isPending, error} = useMutation({

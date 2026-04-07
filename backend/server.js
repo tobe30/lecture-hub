@@ -16,7 +16,7 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:5173", // local dev
-    "https://lecture-hub.vercel.app" // production
+    "https://lecture-hub-nine.vercel.app" // production
   ],
   credentials: true,
 }));
