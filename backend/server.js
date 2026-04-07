@@ -26,6 +26,7 @@ app.use(cookieParser());
 
 
 // Routes
+app.get('/', (req, res) => res.send('server is running'));
 app.use("/api/auth", authRoutes);
 app.use("/api/class", classRoutes);
 app.use("/api/sessions", sessionRoutes);
